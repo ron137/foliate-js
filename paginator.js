@@ -84,6 +84,11 @@ const getBoundingClientRect = target => {
 }
 
 const getVisibleRange = (doc, start, end, mapRect) => {
+    // The iframe document can be torn down between a scroll event and the
+    // queued afterScroll callback (e.g. when navigating between chapters
+    // from the TOC), leaving doc/body null. Return null and let the caller
+    // skip this stale relocate.
+    if (!doc?.body) return null
     // first get all visible nodes
     const acceptNode = node => {
         const name = node.localName?.toLowerCase()
@@ -1001,6 +1006,9 @@ export class Paginator extends HTMLElement {
     }
     #afterScroll(reason) {
         const range = this.#getVisibleRange()
+        // Document was torn down before this callback ran — drop the stale
+        // event instead of dispatching a relocate with null range.
+        if (!range) return
         this.#lastVisibleRange = range
         // don't set new anchor if relocation was to scroll to anchor
         if (reason !== 'selection' && reason !== 'navigation' && reason !== 'anchor')
