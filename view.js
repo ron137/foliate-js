@@ -359,7 +359,18 @@ export class View extends HTMLElement {
                     .then(x => x ? globalThis.open(href, '_blank') : null)
                     .catch(e => console.error(e))
             else Promise.resolve(this.#emit('link', { a, href }, true))
-                .then(x => x ? this.goTo(href) : null)
+                .then(x => {
+                    if (!x) return
+                    // Defer one animation frame so WebKit (mobile Safari in
+                    // particular) finishes its post-tap layout pass before
+                    // we compute the anchor's bounding rect. Without this,
+                    // an in-iframe TOC tap on iOS lands a few pages past
+                    // the target because rect.left is read against a column
+                    // width that is about to change. Matches the existing
+                    // requestAnimationFrame buffering in paginator's focusin
+                    // handler.
+                    requestAnimationFrame(() => this.goTo(href))
+                })
                 .catch(e => console.error(e))
         })
     }
