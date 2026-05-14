@@ -975,13 +975,35 @@ export class Paginator extends HTMLElement {
     }
     async #scrollToAnchor(anchor, reason = 'anchor') {
         this.#anchor = anchor
-        const rects = uncollapse(anchor)?.getClientRects?.()
+        const target = uncollapse(anchor)
+        let rects = target?.getClientRects?.()
         // if anchor is an element or a range
         if (rects) {
             // when the start of the range is immediately after a hyphen in the
             // previous column, there is an extra zero width rect in that column
-            const rect = Array.from(rects)
+            let rect = Array.from(rects)
                 .find(r => r.width > 0 && r.height > 0) || rects[0]
+
+            // Empty inline marker elements like `<a id="x"></a>` (a common
+            // InDesign export pattern for cross-references and in-book TOC
+            // anchors) report a zero-width client rect whose position can
+            // drift several columns away from the intended target in WebKit's
+            // multi-column RTL flow. Fall back to the parent block's rect,
+            // which is what the link semantically points at anyway. Guarded
+            // tightly so it only triggers for genuinely empty markers — not
+            // for elements that are non-empty but happen to lack a non-zero
+            // rect (loading images, hidden content, ranges, etc.).
+            if (rect && (rect.width === 0 || rect.height === 0)
+                && target.nodeType === 1
+                && target.children.length === 0
+                && !target.textContent.trim()
+                && target.parentElement) {
+                const parentRects = target.parentElement.getClientRects()
+                const better = Array.from(parentRects)
+                    .find(r => r.width > 0 && r.height > 0)
+                if (better) rect = better
+            }
+
             if (!rect) return
             await this.#scrollToRect(rect, reason)
             return
