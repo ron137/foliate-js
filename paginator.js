@@ -903,8 +903,17 @@ export class Paginator extends HTMLElement {
         }
     }
     #onTouchEnd() {
+        // Capture before the reset so the deferred rAF below can tell
+        // whether the touch involved any actual scrolling.
+        const wasScrolled = this.#touchScrolled
         this.#touchScrolled = false
         if (this.scrolled) return
+        // Skip snap for stationary taps. snap() is meant to settle a
+        // fling gesture; running it for a tap with vx=0 schedules an
+        // animated scroll-to-current-page that races a same-tap section
+        // change (link click), causing the new section to land on the
+        // old section's page index instead of the navigation anchor.
+        if (!wasScrolled) return
 
         // XXX: Firefox seems to report scale as 1... sometimes...?
         // at this point I'm basically throwing `requestAnimationFrame` at
